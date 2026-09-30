@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart>=0.0.9
+pyyaml
+faster-whisper>=1.0.3
+pyannote.audio>=3.3.2,<4
+huggingface_hub

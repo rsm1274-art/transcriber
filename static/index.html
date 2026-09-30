@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complaint Audio Intake & Diarization Terminal</title>
+  <style>
+    :root {
+      --bg-dark:#090d16; --bg-panel:#111827; --bg-card:#1f2937; --bg-subtle:#1e293b;
+      --border-main:#374151; --border-focus:#6366f1; --text-main:#f9fafb; --text-muted:#9ca3af;
+      --accent:#4f46e5; --accent-hover:#4338ca; --accent-glow:rgba(99,102,241,.2);
+      --officer-color:#38bdf8; --officer-bg:rgba(56,189,248,.1); --officer-border:rgba(56,189,248,.3);
+      --complainant-color:#f59e0b; --complainant-bg:rgba(245,158,11,.1); --complainant-border:rgba(245,158,11,.3);
+      --other-color:#a3a3a3; --other-bg:rgba(163,163,163,.1); --other-border:rgba(163,163,163,.3);
+      --danger:#ef4444; --radius:8px;
+      --font-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+      --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg-dark); color:var(--text-main); font-family:var(--font-sans); line-height:1.5; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+    header { background:var(--bg-panel); border-bottom:1px solid var(--border-main); padding:10px 20px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+    .brand-group { display:flex; align-items:center; gap:12px; }
+    .brand-badge { background:#1e1b4b; color:#818cf8; border:1px solid #4338ca; font-size:11px; font-weight:700; padding:3px 8px; border-radius:4px; letter-spacing:.05em; text-transform:uppercase; }
+    .header-actions { display:flex; align-items:center; gap:10px; }
+    .btn-header { background:var(--bg-card); border:1px solid var(--border-main); color:var(--text-main); padding:6px 12px; border-radius:6px; font-size:12px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .15s ease; }
+    .btn-header:hover { background:var(--bg-subtle); border-color:var(--border-focus); }
+    .btn-header:disabled { opacity:.5; cursor:not-allowed; }
+    .app-layout { flex:1; display:grid; grid-template-columns:400px 1fr; overflow:hidden; }
+    @media (max-width:1024px) { .app-layout { grid-template-columns:340px 1fr; } }
+    aside { background:var(--bg-panel); border-right:1px solid var(--border-main); padding:16px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; }
+    .panel-card { background:#0f172a; border:1px solid var(--border-main); border-radius:var(--radius); padding:14px; }
+    .panel-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+    .dropzone { border:2px dashed #475569; border-radius:var(--radius); padding:18px 12px; text-align:center; cursor:pointer; background:#0b0f17; transition:all .2s ease; }
+    .dropzone:hover, .dropzone.dragover { border-color:#818cf8; background:rgba(99,102,241,.05); }
+    .dropzone svg { color:#818cf8; }
+    .dropzone strong { display:block; font-size:13px; color:#f1f5f9; margin-bottom:3px; word-break:break-all; }
+    .dropzone span { font-size:11px; color:#94a3b8; }
+    .audio-player-box { margin-top:10px; background:#0b0f17; border:1px solid #334155; border-radius:6px; padding:10px; display:none; }
+    .audio-meta-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:11px; }
+    .audio-controls { display:flex; align-items:center; gap:8px; margin-top:6px; }
+    .btn-audio-ctrl { background:#1e293b; border:1px solid #475569; color:#e2e8f0; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer; }
+    .btn-audio-ctrl:hover { background:#334155; }
+    .cfg-group { display:flex; flex-direction:column; gap:10px; font-size:12px; }
+    .field-label { font-size:11px; color:var(--text-muted); margin-bottom:3px; display:block; }
+    input[type="text"], input[type="number"], select, textarea { width:100%; background:#0b0f17; border:1px solid #334155; color:#f1f5f9; padding:6px 10px; border-radius:5px; font-size:12px; outline:none; }
+    input:focus, select:focus, textarea:focus { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-glow); }
+    .btn-action-primary { width:100%; background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background .15s ease; }
+    .btn-action-primary:hover { background:var(--accent-hover); }
+    .btn-action-primary:disabled { opacity:.6; cursor:not-allowed; }
+    .progress-box { margin-top:10px; background:#0b0f17; border:1px solid #4338ca; border-radius:6px; padding:10px; display:none; }
+    .progress-bar-bg { width:100%; height:6px; background:#1e1b4b; border-radius:3px; overflow:hidden; margin-top:6px; }
+    .progress-bar-fill { width:0%; height:100%; background:linear-gradient(90deg,#6366f1,#38bdf8); transition:width .3s ease; }
+    .status-line { font-size:11px; color:#94a3b8; line-height:1.6; }
+    .status-ok { color:#34d399; } .status-bad { color:#f87171; }
+    section.main-panel { display:flex; flex-direction:column; overflow:hidden; background:var(--bg-dark); }
+    .tab-bar { background:var(--bg-panel); border-bottom:1px solid var(--border-main); display:flex; gap:2px; padding:0 16px; flex-shrink:0; }
+    .tab-btn { background:transparent; border:none; color:var(--text-muted); padding:12px 18px; font-size:13px; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s ease; }
+    .tab-btn:hover { color:var(--text-main); }
+    .tab-btn.active { color:#818cf8; border-bottom-color:#818cf8; background:rgba(99,102,241,.05); }
+    .tab-content { flex:1; padding:20px 24px; overflow-y:auto; display:none; }
+    .tab-content.active { display:block; }
+    #errorBanner { display:none; background:#450a0a; border-bottom:1px solid var(--danger); color:#fecaca; padding:10px 24px; font-size:12px; justify-content:space-between; align-items:flex-start; gap:12px; white-space:pre-wrap; }
+    #errorBanner.warn { background:#422006; border-color:#f59e0b; color:#fde68a; }
+    #errorBanner button { background:none; border:none; color:inherit; cursor:pointer; font-size:14px; }
+    .meta-ribbon { background:var(--bg-card); border:1px solid var(--border-main); border-radius:var(--radius); padding:14px 18px; display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px; }
+    .meta-item-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:2px; }
+    .meta-item-val { font-size:13px; font-weight:600; color:#f3f4f6; }
+    .format-switcher-card { background:#0f172a; border:1px solid #334155; border-radius:var(--radius); padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+    .format-btn-group { display:flex; background:#1e293b; padding:3px; border-radius:6px; gap:2px; }
+    .btn-format { background:transparent; border:none; color:#94a3b8; padding:6px 14px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; }
+    .btn-format:hover { color:#f1f5f9; }
+    .btn-format.active { background:#4f46e5; color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); }
+    .format-actions { display:flex; gap:8px; }
+    .narrative-card { background:var(--bg-card); border:1px solid var(--border-main); border-radius:var(--radius); padding:20px; margin-bottom:18px; }
+    .narrative-badge { display:inline-block; background:#14532d; color:#86efac; border:1px solid #22c55e; font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:.05em; }
+    .narrative-text { font-size:14px; line-height:1.7; color:#e2e8f0; white-space:pre-line; margin-top:8px; }
+    .structured-section { display:flex; flex-direction:column; gap:14px; }
+    .allegation-card { background:#0f172a; border:1px solid #334155; border-left:4px solid var(--danger); border-radius:var(--radius); padding:14px 18px; }
+    .allegation-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px; }
+    .allegation-title { font-size:13px; font-weight:700; color:#f87171; }
+    .allegation-tag { font-size:10px; font-family:var(--font-mono); background:#450a0a; color:#fca5a5; padding:2px 6px; border-radius:4px; }
+    .transcript-container { display:flex; flex-direction:column; gap:12px; }
+    .speech-bubble { display:flex; flex-direction:column; border-radius:var(--radius); padding:12px 16px; border:1px solid transparent; cursor:pointer; transition:all .15s ease; }
+    .speech-bubble:hover { transform:translateX(2px); }
+    .speech-bubble.officer { background:var(--officer-bg); border-color:var(--officer-border); border-left:4px solid var(--officer-color); }
+    .speech-bubble.complainant { background:var(--complainant-bg); border-color:var(--complainant-border); border-left:4px solid var(--complainant-color); }
+    .speech-bubble.other { background:var(--other-bg); border-color:var(--other-border); border-left:4px solid var(--other-color); }
+    .bubble-meta { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .speaker-name { font-size:12px; font-weight:700; }
+    .officer .speaker-name { color:var(--officer-color); } .complainant .speaker-name { color:var(--complainant-color); } .other .speaker-name { color:var(--other-color); }
+    .timestamp-chip { font-size:11px; font-family:var(--font-mono); background:rgba(0,0,0,.4); color:var(--text-muted); padding:1px 6px; border-radius:4px; }
+    .bubble-text { font-size:13px; line-height:1.55; color:#f3f4f6; }
+    .speaker-row { display:grid; grid-template-columns:90px 1fr 140px; gap:8px; align-items:center; margin-bottom:6px; font-size:12px; }
+    #toast { position:fixed; bottom:24px; right:24px; background:#1e293b; color:#fff; border:1px solid #475569; padding:10px 18px; border-radius:6px; font-size:12px; box-shadow:0 10px 25px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:opacity .25s ease; z-index:1000; max-width:420px; }
+    #toast.show { opacity:1; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand-group">
+      <span class="brand-badge">Air-Gapped Local</span>
+      <h1 style="font-size:14px;font-weight:700;letter-spacing:.02em;">Internal Affairs Audio Intake Terminal</h1>
+    </div>
+    <div class="header-actions">
+      <button class="btn-header" onclick="resetWorkspace()">Reset</button>
+    </div>
+  </header>
+
+  <div class="app-layout">
+    <aside>
+      <div class="panel-card">
+        <div class="panel-title">
+          <span>1. Ingest Audio Recording</span>
+          <span id="audioStatusBadge" style="color:#64748b;font-size:10px;">Waiting</span>
+        </div>
+        <div class="dropzone" id="dropArea" onclick="document.getElementById('fileUploadInput').click()">
+          <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin:0 auto 6px auto;display:block;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+          <strong id="dropPromptTitle">Click or Drag Audio File Here</strong>
+          <span id="dropPromptSub">Supports .M4A, .MP3, .WAV, .OGG, .FLAC</span>
+        </div>
+        <input type="file" id="fileUploadInput" accept="audio/*,.m4a,.mp3,.wav,.ogg,.flac,.aac" onchange="handleAudioSelect(event)" style="display:none;">
+
+        <div id="audioPlayerPanel" class="audio-player-box">
+          <div class="audio-meta-row">
+            <span id="audioTrackLabel" style="font-weight:600;color:#cbd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;">Audio Track</span>
+            <span id="audioTimeLabel" style="font-family:var(--font-mono);color:#94a3b8;">00:00 / 00:00</span>
+          </div>
+          <audio id="mainAudio" controls style="width:100%;height:32px;"></audio>
+          <div class="audio-controls">
+            <button class="btn-audio-ctrl" onclick="seekRelative(-5)">-5s</button>
+            <button class="btn-audio-ctrl" onclick="seekRelative(5)">+5s</button>
+            <span style="font-size:11px;color:#64748b;margin-left:auto;">Speed:</span>
+            <select id="playbackSpeedSelect" onchange="setAudioSpeed(this.value)" style="width:60px;padding:2px 4px;font-size:11px;">
+              <option value="1">1.0x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2.0x</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-title"><span>2. Local Whisper + Diarizer + LLM</span></div>
+        <div class="cfg-group">
+          <div id="statusBox" class="status-line">Checking local server...</div>
+          <div>
+            <span class="field-label">Whisper model:</span>
+            <select id="whisperModelSelect"></select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <span class="field-label">Language (blank = auto):</span>
+              <input type="text" id="languageInput" value="en">
+            </div>
+            <div>
+              <span class="field-label">Speakers (0 = auto):</span>
+              <input type="number" id="numSpeakersInput" value="2" min="0" max="10">
+            </div>
+          </div>
+          <div>
+            <span class="field-label">Ollama model (summary):</span>
+            <select id="ollamaModelSelect"></select>
+          </div>
+          <div>
+            <span class="field-label">Default view:</span>
+            <select id="defaultViewSelect" onchange="setDisplayFormat(this.value)">
+              <option value="narrative">10th-Grade Narrative</option>
+              <option value="structured">Structured Allegations</option>
+              <option value="combined" selected>Combined Dossier</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="progressContainer" class="progress-box">
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span id="progressMessage" style="color:#a5b4fc;font-weight:600;">Processing...</span>
+            <span id="progressPercent" style="color:#818cf8;font-family:var(--font-mono);">0%</span>
+          </div>
+          <div class="progress-bar-bg"><div id="progressBar" class="progress-bar-fill"></div></div>
+        </div>
+
+        <button id="btnRunProcessing" class="btn-action-primary" style="margin-top:12px;" onclick="executeAudioIntake()">Transcribe & Diarize Audio</button>
+      </div>
+    </aside>
+
+    <section class="main-panel">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="setPrimaryTab('summary')">Complaint Dossier & Summary</button>
+        <button class="tab-btn" onclick="setPrimaryTab('transcript')">Diarized Verbatim Transcript (<span id="transcriptCountBadge">0</span>)</button>
+        <button class="tab-btn" onclick="setPrimaryTab('export')">Raw Data & Export</button>
+      </div>
+      <div id="errorBanner"><span id="errorText"></span><button onclick="hideBanner()">&#10005;</button></div>
+
+      <div id="tabSummary" class="tab-content active">
+        <div class="meta-ribbon">
+          <div><div class="meta-item-label">Case Tracking #</div><div class="meta-item-val" id="metaCaseNum"></div></div>
+          <div><div class="meta-item-label">Complainant</div><div class="meta-item-val" id="metaComplainant"></div></div>
+          <div><div class="meta-item-label">Incident Date & Time</div><div class="meta-item-val" id="metaIncidentTime"></div></div>
+          <div><div class="meta-item-label">Intake Investigator</div><div class="meta-item-val" id="metaInvestigator"></div></div>
+        </div>
+
+        <div class="format-switcher-card">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;letter-spacing:.05em;">Summary View:</span>
+            <div class="format-btn-group">
+              <button id="fmtBtnNarrative" class="btn-format" onclick="setDisplayFormat('narrative')">Narrative</button>
+              <button id="fmtBtnStructured" class="btn-format" onclick="setDisplayFormat('structured')">Structured</button>
+              <button id="fmtBtnCombined" class="btn-format active" onclick="setDisplayFormat('combined')">Combined</button>
+            </div>
+          </div>
+          <div class="format-actions">
+            <button class="btn-header" onclick="copyNarrativeText()">Copy Narrative</button>
+            <button class="btn-header" onclick="copyStructuredMarkdown()">Copy Structured</button>
+          </div>
+        </div>
+
+        <div id="narrativeSectionWrapper" class="narrative-card">
+          <span class="narrative-badge">10th-Grade Comprehension Level Narrative</span>
+          <div id="narrativeContent" class="narrative-text"></div>
+        </div>
+
+        <div id="structuredSectionWrapper" class="structured-section">
+          <div class="panel-card">
+            <div class="panel-title"><span>Enumerated Allegations & Potential Violations</span></div>
+            <div style="display:flex;flex-direction:column;gap:10px;" id="allegationsList"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="panel-card">
+              <div class="panel-title">Physical Evidence Mentioned</div>
+              <ul id="evidenceList" style="font-size:12px;color:#cbd5e1;padding-left:18px;line-height:1.8;"></ul>
+            </div>
+            <div class="panel-card">
+              <div class="panel-title">Investigative Follow-Up Actions</div>
+              <ul id="followUpList" style="font-size:12px;color:#cbd5e1;padding-left:18px;line-height:1.8;"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabTranscript" class="tab-content">
+        <div class="panel-card" style="margin-bottom:16px;">
+          <div class="panel-title">
+            <span>Speaker Roles (verify, then regenerate summary)</span>
+            <button id="btnResummarize" class="btn-header" onclick="runSummary()" disabled>Regenerate Summary</button>
+          </div>
+          <div id="speakerPanel" style="font-size:12px;color:#94a3b8;">Process a recording to identify speakers.</div>
+        </div>
+        <p style="font-size:11px;color:#94a3b8;margin-bottom:10px;">Click any speech bubble to jump playback to that timestamp.</p>
+        <div id="dialogueStream" class="transcript-container"></div>
+      </div>
+
+      <div id="tabExport" class="tab-content">
+        <div class="panel-card" style="height:100%;display:flex;flex-direction:column;">
+          <div class="panel-title">
+            <span>Dossier Raw Output & Export</span>
+            <button class="btn-header" onclick="downloadMarkdownFile()">Download .MD File</button>
+          </div>
+          <textarea id="rawExportTextarea" style="flex:1;min-height:380px;font-family:var(--font-mono);font-size:11px;line-height:1.6;resize:none;" readonly></textarea>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast">Notice</div>
+
+  <script>
+    const EMPTY_RECORD = {
+      caseNumber: "Awaiting Processing...", complainantName: "—", incidentTime: "—", investigator: "—",
+      narrativeSummary: "Attach an audio recording and click \"Transcribe & Diarize Audio\".",
+      allegations: [], physicalEvidence: [], followUpActions: [], dialogue: []
+    };
+    const ROLE_LABEL = { officer: "Intake Officer", complainant: "Complainant", other: "Other" };
+
+    let activeRecord = null;
+    let selectedAudioFile = null;
+    let currentFormatMode = 'combined';
+    let audioObjectUrl = null;
+    let turns = [];          // raw diarized turns [{time, speaker:"Speaker 1", text}]
+    let speakerMap = {};     // "Speaker 1" -> {name, role}
+    let summaryFields = {};  // last LLM output (minus dialogue)
+    let busy = false;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadRecordData(EMPTY_RECORD);
+      loadHealth();
+
+      const audio = document.getElementById('mainAudio');
+      audio.addEventListener('timeupdate', () => {
+        updateAudioTimeLabel(audio.currentTime, audio.duration);
+        highlightActiveSpeechTurn(audio.currentTime);
+      });
+      audio.addEventListener('loadedmetadata', () => updateAudioTimeLabel(audio.currentTime, audio.duration));
+
+      const dropArea = document.getElementById('dropArea');
+      ['dragenter', 'dragover'].forEach(n => dropArea.addEventListener(n, e => { e.preventDefault(); dropArea.classList.add('dragover'); }));
+      ['dragleave', 'drop'].forEach(n => dropArea.addEventListener(n, e => { e.preventDefault(); dropArea.classList.remove('dragover'); }));
+      dropArea.addEventListener('drop', e => {
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) attachAudioFile(e.dataTransfer.files[0]);
+      });
+      // Dropping outside the zone must not navigate away from the app
+      ['dragover', 'drop'].forEach(n => window.addEventListener(n, e => e.preventDefault()));
+    });
+
+    /* ---- Server status ---- */
+    async function loadHealth() {
+      const box = document.getElementById('statusBox');
+      try {
+        const h = await (await fetch('/api/health')).json();
+        const wsel = document.getElementById('whisperModelSelect');
+        wsel.innerHTML = h.whisperModels.map(m => `<option>${escapeHtml(m)}</option>`).join('') || '<option value="">(none installed)</option>';
+        const osel = document.getElementById('ollamaModelSelect');
+        const om = h.ollamaModels || [];
+        osel.innerHTML = om.map(m => `<option>${escapeHtml(m)}</option>`).join('') || '<option value="">(none)</option>';
+        const line = (ok, txt) => `<span class="${ok ? 'status-ok' : 'status-bad'}">${ok ? '●' : '○'}</span> ${txt}`;
+        box.innerHTML = [
+          line(true, h.cuda ? 'GPU (CUDA) available' : 'No GPU detected - running on CPU (slower)'),
+          line(h.whisperModels.length > 0, h.whisperModels.length ? 'Whisper models installed' : 'No Whisper model in models/whisper'),
+          line(h.diarizer, h.diarizer ? 'Speaker diarizer installed' : 'Diarizer missing - one speaker only'),
+          line(h.ollamaModels !== null && om.length > 0, h.ollamaModels === null ? 'Ollama not reachable' : (om.length ? 'Ollama ready' : 'Ollama has no models'))
+        ].join('<br>');
+      } catch (e) {
+        box.innerHTML = '<span class="status-bad">Local server not reachable.</span> Start it with <code>python server.py</code> and open http://127.0.0.1:8000 (do not open this file directly).';
+      }
+    }
+
+    /* ---- Rendering ---- */
+    function loadRecordData(record) {
+      activeRecord = record;
+      document.getElementById('metaCaseNum').textContent = record.caseNumber || 'Not stated';
+      document.getElementById('metaComplainant').textContent = record.complainantName || 'Not stated';
+      document.getElementById('metaIncidentTime').textContent = record.incidentTime || 'Not stated';
+      document.getElementById('metaInvestigator').textContent = record.investigator || 'Not stated';
+      document.getElementById('narrativeContent').textContent = record.narrativeSummary || 'No narrative generated yet.';
+
+      const allegList = document.getElementById('allegationsList');
+      allegList.innerHTML = '';
+      if (record.allegations && record.allegations.length) {
+        record.allegations.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'allegation-card';
+          card.innerHTML = `<div class="allegation-header"><span class="allegation-title">${escapeHtml(item.title)}</span><span class="allegation-tag">${escapeHtml(item.category || 'Review Required')}</span></div>
+            <div style="font-size:12px;color:#cbd5e1;">${escapeHtml(item.description)}</div>`;
+          allegList.appendChild(card);
+        });
+      } else {
+        allegList.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:8px 0;">No allegations extracted.</div>';
+      }
+      fillList('evidenceList', record.physicalEvidence, 'None identified.');
+      fillList('followUpList', record.followUpActions, 'None recorded.');
+
+      renderDialogueStream(record.dialogue || []);
+      document.getElementById('rawExportTextarea').value = generateMarkdownDossier();
+      setDisplayFormat(currentFormatMode);
+    }
+
+    function fillList(id, items, emptyMsg) {
+      const ul = document.getElementById(id);
+      ul.innerHTML = '';
+      (items && items.length ? items : [emptyMsg]).forEach(t => {
+        const li = document.createElement('li'); li.textContent = t; ul.appendChild(li);
+      });
+    }
+
+    function renderDialogueStream(dialogue) {
+      const container = document.getElementById('dialogueStream');
+      container.innerHTML = '';
+      document.getElementById('transcriptCountBadge').textContent = dialogue.length;
+      if (!dialogue.length) {
+        container.innerHTML = '<p style="color:#94a3b8;font-size:12px;">No dialogue turns recorded yet.</p>';
+        return;
+      }
+      dialogue.forEach((turn, idx) => {
+        const bubble = document.createElement('div');
+        bubble.className = `speech-bubble ${turn.role}`;
+        bubble.id = `turn-${idx}`;
+        bubble.onclick = () => jumpToAudioTime(turn.time);
+        bubble.innerHTML = `<div class="bubble-meta"><span class="speaker-name">${escapeHtml(turn.speaker)}</span><span class="timestamp-chip">${formatSeconds(turn.time)}</span></div>
+          <div class="bubble-text">${escapeHtml(turn.text)}</div>`;
+        container.appendChild(bubble);
+      });
+    }
+
+    function buildDialogue() {
+      return turns.map(t => {
+        const m = speakerMap[t.speaker] || { name: t.speaker, role: 'other' };
+        return { time: t.time, speaker: m.name, role: m.role, text: t.text };
+      });
+    }
+
+    function renderSpeakerPanel() {
+      const p = document.getElementById('speakerPanel');
+      p.innerHTML = '';
+      Object.keys(speakerMap).forEach(id => {
+        const row = document.createElement('div');
+        row.className = 'speaker-row';
+        row.innerHTML = `<span>${escapeHtml(id)}</span>
+          <input type="text" value="${escapeHtml(speakerMap[id].name)}">
+          <select>${Object.entries(ROLE_LABEL).map(([v, l]) => `<option value="${v}" ${speakerMap[id].role === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+        row.querySelector('input').oninput = e => { speakerMap[id].name = e.target.value; refreshDialogueOnly(); };
+        row.querySelector('select').onchange = e => { speakerMap[id].role = e.target.value; refreshDialogueOnly(); };
+        p.appendChild(row);
+      });
+    }
+
+    function refreshDialogueOnly() {
+      activeRecord.dialogue = buildDialogue();
+      renderDialogueStream(activeRecord.dialogue);
+      document.getElementById('rawExportTextarea').value = generateMarkdownDossier();
+    }
+
+    /* ---- Audio attach ---- */
+    function handleAudioSelect(e) {
+      if (e.target.files && e.target.files[0]) attachAudioFile(e.target.files[0]);
+      e.target.value = '';   // allow re-selecting the same file
+    }
+
+    function attachAudioFile(file) {
+      selectedAudioFile = file;
+      turns = []; speakerMap = {}; summaryFields = {};
+      hideBanner();
+      document.getElementById('speakerPanel').textContent = 'Process a recording to identify speakers.';
+      document.getElementById('btnResummarize').disabled = true;
+      loadRecordData({
+        ...EMPTY_RECORD,
+        caseNumber: "Awaiting Processing...",
+        complainantName: file.name.replace(/\.[^/.]+$/, ""),
+        narrativeSummary: `Audio file "${file.name}" loaded. Click "Transcribe & Diarize Audio".`
+      });
+
+      document.getElementById('dropPromptTitle').textContent = file.name;
+      document.getElementById('dropPromptSub').textContent = `${(file.size / (1024 * 1024)).toFixed(2)} MB • Ready for Intake`;
+      document.getElementById('audioStatusBadge').textContent = 'Audio Attached';
+      document.getElementById('audioStatusBadge').style.color = '#38bdf8';
+
+      if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
+      audioObjectUrl = URL.createObjectURL(file);
+      document.getElementById('mainAudio').src = audioObjectUrl;
+      document.getElementById('audioTrackLabel').textContent = file.name;
+      document.getElementById('audioPlayerPanel').style.display = 'block';
+      showToast(`Audio attached: ${file.name}`);
+    }
+
+    /* ---- Tabs / format ---- */
+    function setPrimaryTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', ['summary', 'transcript', 'export'][i] === tabName));
+      document.getElementById('tabSummary').classList.toggle('active', tabName === 'summary');
+      document.getElementById('tabTranscript').classList.toggle('active', tabName === 'transcript');
+      document.getElementById('tabExport').classList.toggle('active', tabName === 'export');
+    }
+
+    function setDisplayFormat(mode) {
+      currentFormatMode = mode;
+      document.getElementById('defaultViewSelect').value = mode;
+      document.getElementById('fmtBtnNarrative').classList.toggle('active', mode === 'narrative');
+      document.getElementById('fmtBtnStructured').classList.toggle('active', mode === 'structured');
+      document.getElementById('fmtBtnCombined').classList.toggle('active', mode === 'combined');
+      document.getElementById('narrativeSectionWrapper').style.display = mode === 'structured' ? 'none' : 'block';
+      document.getElementById('structuredSectionWrapper').style.display = mode === 'narrative' ? 'none' : 'flex';
+    }
+
+    /* ---- Audio player ---- */
+    function jumpToAudioTime(seconds) {
+      const audio = document.getElementById('mainAudio');
+      if (audio.src) { audio.currentTime = seconds; audio.play().catch(() => {}); }
+    }
+    function seekRelative(offset) {
+      const audio = document.getElementById('mainAudio');
+      if (audio.src) audio.currentTime = Math.max(0, audio.currentTime + offset);
+    }
+    function setAudioSpeed(speed) { document.getElementById('mainAudio').playbackRate = parseFloat(speed); }
+    function updateAudioTimeLabel(current, total) {
+      document.getElementById('audioTimeLabel').textContent = `${formatSeconds(current || 0)} / ${formatSeconds(total || 0)}`;
+    }
+    function highlightActiveSpeechTurn(currentTime) {
+      if (!activeRecord || !activeRecord.dialogue) return;
+      let activeIdx = -1;
+      for (let i = 0; i < activeRecord.dialogue.length; i++) {
+        if (currentTime >= activeRecord.dialogue[i].time) activeIdx = i; else break;
+      }
+      document.querySelectorAll('.speech-bubble').forEach((el, idx) => {
+        el.style.boxShadow = idx === activeIdx ? '0 0 0 2px #818cf8' : 'none';
+      });
+    }
+
+    /* ---- Progress / banner ---- */
+    function updateProgress(msg, pct) {
+      document.getElementById('progressContainer').style.display = 'block';
+      document.getElementById('progressMessage').textContent = msg;
+      document.getElementById('progressPercent').textContent = `${pct}%`;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+    }
+    function hideProgress() { document.getElementById('progressContainer').style.display = 'none'; }
+    function showBanner(msg, warn) {
+      const b = document.getElementById('errorBanner');
+      b.className = warn ? 'warn' : '';
+      b.style.display = 'flex';
+      document.getElementById('errorText').textContent = msg;
+    }
+    function hideBanner() { document.getElementById('errorBanner').style.display = 'none'; }
+
+    /* ---- Pipeline ---- */
+    async function executeAudioIntake() {
+      if (busy) return;
+      if (!selectedAudioFile) { showToast("Please attach an audio recording first."); return; }
+      const whisperModel = document.getElementById('whisperModelSelect').value;
+      if (!whisperModel) { showBanner("No Whisper model installed. See README (setup_models.py)."); return; }
+
+      setBusy(true); hideBanner();
+      try {
+        const fd = new FormData();
+        fd.append('file', selectedAudioFile);
+        fd.append('whisper_model', whisperModel);
+        fd.append('language', document.getElementById('languageInput').value.trim());
+        fd.append('num_speakers', document.getElementById('numSpeakersInput').value || '0');
+
+        updateProgress("Uploading to local server...", 2);
+        const resp = await fetch('/api/process', { method: 'POST', body: fd });
+        if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+
+        let result = null;
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        const handle = line => {
+          if (!line.trim()) return;
+          const msg = JSON.parse(line);
+          if (msg.type === 'progress') updateProgress(msg.message, msg.pct);
+          else if (msg.type === 'error') throw new Error(msg.message);
+          else if (msg.type === 'result') result = msg;
+        };
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split('\n'); buf = lines.pop();
+          lines.forEach(handle);
+        }
+        handle(buf);
+        if (!result) throw new Error("Server ended the response without a result.");
+
+        turns = result.turns;
+        speakerMap = {};
+        result.speakers.forEach((id, i) => {
+          speakerMap[id] = i === 0 ? { name: 'Intake Officer', role: 'officer' }
+            : i === 1 ? { name: 'Complainant', role: 'complainant' }
+            : { name: `Other ${i - 1}`, role: 'other' };
+        });
+        renderSpeakerPanel();
+        summaryFields = {};
+        loadRecordData({ ...EMPTY_RECORD, caseNumber: "Summarizing...", narrativeSummary: "Transcript ready. Generating summary with the local LLM...", dialogue: buildDialogue() });
+        if (result.warnings && result.warnings.length) showBanner(result.warnings.join('\n'), true);
+        document.getElementById('audioStatusBadge').textContent = `Transcribed (${result.device.toUpperCase()})`;
+
+        await runSummary(true);
+      } catch (err) {
+        console.error(err);
+        hideProgress();
+        showBanner(`Processing error: ${err.message}`);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function runSummary(fromPipeline) {
+      if (!turns.length || (busy && !fromPipeline)) return;
+      const model = document.getElementById('ollamaModelSelect').value;
+      if (!model) { showBanner("No Ollama model available. Transcript is shown, but no summary was generated.", true); hideProgress(); finishWithoutSummary(); return; }
+      if (!fromPipeline) setBusy(true);
+      try {
+        updateProgress("Summarizing with local LLM...", 85);
+        const body = {
+          model,
+          turns: turns.map(t => {
+            const m = speakerMap[t.speaker];
+            return { time: t.time, speaker: `${m.name} (${ROLE_LABEL[m.role]})`, text: t.text };
+          })
+        };
+        const resp = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `Server returned ${resp.status}`);
+        summaryFields = data.summary;
+        loadRecordData({ ...summaryFields, dialogue: buildDialogue() });
+        if (data.warning) showBanner(data.warning, true);
+        updateProgress("Intake completed.", 100);
+        setTimeout(hideProgress, 1200);
+        showToast("Intake audio processed & diarized.");
+      } catch (err) {
+        console.error(err);
+        hideProgress();
+        showBanner(`Summary failed: ${err.message}\nThe verbatim transcript is available in the Transcript tab.`);
+        finishWithoutSummary();
+      } finally {
+        if (!fromPipeline) setBusy(false);
+      }
+    }
+
+    function finishWithoutSummary() {
+      loadRecordData({ ...EMPTY_RECORD, caseNumber: "Summary unavailable", complainantName: selectedAudioFile ? selectedAudioFile.name.replace(/\.[^/.]+$/, "") : "—",
+        narrativeSummary: "No summary generated. See the Transcript tab for the diarized dialogue.", dialogue: buildDialogue() });
+    }
+
+    function setBusy(b) {
+      busy = b;
+      document.getElementById('btnRunProcessing').disabled = b;
+      document.getElementById('btnResummarize').disabled = b || !turns.length;
+    }
+
+    /* ---- Copy / export ---- */
+    function copyNarrativeText() {
+      const text = document.getElementById('narrativeContent').textContent.trim();
+      navigator.clipboard.writeText(text).then(() => showToast("Narrative copied.")).catch(() => copyFallback(text));
+    }
+    function copyStructuredMarkdown() {
+      const md = generateMarkdownDossier();
+      navigator.clipboard.writeText(md).then(() => showToast("Structured dossier copied.")).catch(() => copyFallback(md));
+    }
+    function copyFallback(str) {
+      const ta = document.createElement("textarea");
+      ta.value = str; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      showToast("Copied to clipboard.");
+    }
+    function generateMarkdownDossier() {
+      const r = activeRecord;
+      if (!r) return "";
+      const list = a => (a && a.length ? a.map(x => `- ${x}`).join("\n") : "- None");
+      return `# INTERNAL AFFAIRS COMPLAINT INTAKE DOSSIER
+**Tracking Number:** ${r.caseNumber}
+**Complainant:** ${r.complainantName}
+**Address:** ${r.address || 'N/A'}
+**Phone:** ${r.phone || 'N/A'}
+**Incident Date/Time:** ${r.incidentTime}
+**Intake Officer:** ${r.investigator}
+
+---
+
+## 1. INCIDENT NARRATIVE (10th-Grade Comprehension Level)
+${r.narrativeSummary}
+
+---
+
+## 2. ITEMIZED ALLEGATIONS
+${(r.allegations || []).map(a => `### ${a.title} [${a.category}]\n${a.description}`).join("\n\n")}
+
+## 3. PHYSICAL EVIDENCE
+${list(r.physicalEvidence)}
+
+## 4. FOLLOW-UP ACTIONS
+${list(r.followUpActions)}
+
+---
+
+## 5. VERBATIM DIARIZED TRANSCRIPT
+${(r.dialogue || []).map(d => `[${formatSeconds(d.time)}] **${d.speaker}**: ${d.text}`).join("\n\n")}
+`;
+    }
+    function downloadMarkdownFile() {
+      const content = document.getElementById('rawExportTextarea').value;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([content], { type: 'text/markdown' }));
+      a.download = `IA_Intake_${activeRecord ? activeRecord.caseNumber.replace(/[^\w.-]+/g, '_') : 'Record'}.md`;
+      a.click();
+      showToast("Markdown dossier downloaded");
+    }
+
+    /* ---- Reset ---- */
+    function resetWorkspace() {
+      if (busy) return;
+      selectedAudioFile = null; turns = []; speakerMap = {}; summaryFields = {};
+      document.getElementById('fileUploadInput').value = '';
+      if (audioObjectUrl) { URL.revokeObjectURL(audioObjectUrl); audioObjectUrl = null; }
+      const audio = document.getElementById('mainAudio');
+      audio.removeAttribute('src'); audio.load();
+      document.getElementById('dropPromptTitle').textContent = "Click or Drag Audio File Here";
+      document.getElementById('dropPromptSub').textContent = "Supports .M4A, .MP3, .WAV, .OGG, .FLAC";
+      document.getElementById('audioStatusBadge').textContent = 'Waiting';
+      document.getElementById('audioStatusBadge').style.color = '#64748b';
+      document.getElementById('audioPlayerPanel').style.display = 'none';
+      document.getElementById('speakerPanel').textContent = 'Process a recording to identify speakers.';
+      document.getElementById('btnResummarize').disabled = true;
+      hideBanner(); hideProgress();
+      loadRecordData(EMPTY_RECORD);
+      showToast("Workspace cleared");
+    }
+
+    /* ---- Helpers ---- */
+    function formatSeconds(sec) {
+      const s = Math.floor(Number(sec) || 0);
+      return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    }
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg; toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+  </script>
+</body>
+</html>
